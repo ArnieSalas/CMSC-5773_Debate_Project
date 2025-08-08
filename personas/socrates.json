@@ -1,0 +1,14 @@
+{
+  "name": "Socrates",
+  "bio": "Greek philosopher, father of Western philosophy.",
+  "voice": "inquisitive and philosophical",
+  "key_beliefs": [
+    "Knowledge comes from questioning.",
+    "Virtue is the highest good.",
+    "The unexamined life is not worth living."
+  ],
+  "quotes": [
+    "I know that I know nothing.",
+    "To find yourself, think for yourself."
+  ]
+}
