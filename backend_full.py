@@ -71,10 +71,17 @@ def load_persona(name):
 
 def build_prompt(persona, history, user_question):
     history_text = "\n".join([f"{sender.capitalize()}: {text}" for sender, text in history])
-    beliefs_text = "\n- " + "\n- ".join(persona["key_beliefs"])
+    
+    # Combine beliefs for the prompt
+    beliefs = persona["beliefs"]
+    beliefs_text = "\n- Political: " + beliefs["political"]
+    beliefs_text += "\n- Freedom: " + beliefs["freedom"]
+    beliefs_text += "\n- War: " + beliefs["war"]
+    beliefs_text += "\n- Government: " + beliefs["government"]
+    beliefs_text += "\n- Values: " + beliefs["values"]
 
     prompt = f"""You are {persona['name']}, a historical figure.
-Your tone is: {persona['voice']}
+Your tone is: {persona['style']['tone']}
 Your core beliefs are:{beliefs_text}
 
 Conversation history:
@@ -82,6 +89,7 @@ Conversation history:
 
 User: {user_question}
 {persona['name']}: """
+    
     return prompt
 
 # --- API Endpoints ---
@@ -115,3 +123,4 @@ def start_session():
     db = next(get_db())
     session = create_session(db)
     return {"session_id": session.id}
+
