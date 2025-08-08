@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey, DateTime
 from sqlalchemy.orm import sessionmaker, declarative_base
 from datetime import datetime
+from fastapi.middleware.cors import CORSMiddleware
 import json
 import os
 
@@ -30,6 +31,15 @@ Base.metadata.create_all(bind=engine)
 
 # --- FastAPI app ---
 app = FastAPI()
+
+# --- Adding CORS for different ports ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  #Restrict to ["http://localhost:5173"] if preferred
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # --- Pydantic models ---
 class MessageInput(BaseModel):
@@ -123,4 +133,3 @@ def start_session():
     db = next(get_db())
     session = create_session(db)
     return {"session_id": session.id}
-
