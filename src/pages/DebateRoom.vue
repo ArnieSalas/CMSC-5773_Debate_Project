@@ -1,23 +1,47 @@
+
 <template>
   <div class="page-container">
-    <h1 class="title">{{ currentPage === 'debate' ? 'Debate Room' : 'Chat Room' }}</h1>
+    <h1 class="title">
+      {{ currentPage === 'debate' ? 'Debate Room' : 'Chat Room' }}
+    </h1>
 
     <!-- Page Switch Tabs -->
     <div class="tabs">
-      <button :class="{ active: currentPage === 'debate' }" @click="currentPage = 'debate'">Debate Room</button>
-      <button :class="{ active: currentPage === 'chat' }" @click="currentPage = 'chat'">Chat Room</button>
+      <button
+        :class="{ active: currentPage === 'debate' }"
+        @click="currentPage = 'debate'"
+      >
+        Debate Room
+      </button>
+      <button
+        :class="{ active: currentPage === 'chat' }"
+        @click="currentPage = 'chat'"
+      >
+        Chat Room
+      </button>
     </div>
 
-    <!-- Animated Outer Content -->
-    <transition name="fade-slide" mode="out-in">
+    <transition
+      name="fade-slide"
+      mode="out-in"
+    >
       <div :key="currentPage">
-
-        <!-- Animated Inner Tab Content -->
-        <transition name="fade-scale" mode="out-in">
+        <transition
+          name="fade-scale"
+          mode="out-in"
+        >
           <div :key="activeTab">
-            <!-- Scrollable Chat/Debate Area -->
-            <div class="scroll-box" ref="scrollBox">
-              <div v-for="(msg, index) in messages" :key="index" class="message">{{ msg }}</div>
+            <div
+              ref="scrollBox"
+              class="scroll-box"
+            >
+              <div
+                v-for="(msg, index) in messages"
+                :key="index"
+                class="message"
+              >
+                {{ msg }}
+              </div>
             </div>
           </div>
         </transition>
@@ -25,19 +49,28 @@
         <!-- Message Input -->
         <div class="message-input">
           <input
-            type="text"
             v-model="newMessage"
+            type="text"
             placeholder="Type a message..."
             @keyup.enter="sendMessage"
-          />
-          <button @click="sendMessage">Send</button>
+          >
+          <button @click="sendMessage">
+            Send
+          </button>
         </div>
 
         <!-- Toggle Buttons -->
         <div class="controls">
-          <div v-for="(option, key) in toggles" :key="key" class="toggle">
+          <div
+            v-for="(option, key) in toggles"
+            :key="key"
+            class="toggle"
+          >
             <span>{{ option.label }}</span>
-            <button :class="{ on: option.state }" @click="option.state = !option.state">
+            <button
+              :class="{ on: option.state }"
+              @click="option.state = !option.state"
+            >
               {{ option.state ? 'ON' : 'OFF' }}
             </button>
           </div>
@@ -47,18 +80,29 @@
         <div class="settings">
           <label>
             Max Length:
-            <input type="number" v-model="maxLength" />
+            <input
+              v-model="maxLength"
+              type="number"
+            >
           </label>
 
-          <!-- Only show rebuttles if in Debate Room -->
           <label v-if="currentPage === 'debate'">
             # Rebuttles:
-            <input type="number" v-model="rebuttles" />
+            <input
+              v-model="rebuttles"
+              type="number"
+            >
           </label>
         </div>
 
-        <!-- Stop button only for Debate Room -->
-        <button v-if="currentPage === 'debate'" class="stop-btn" @click="stopDebate">STOP</button>
+        <!-- Stop button -->
+        <button
+          v-if="currentPage === 'debate'"
+          class="stop-btn"
+          @click="stopDebate"
+        >
+          STOP
+        </button>
       </div>
     </transition>
   </div>
@@ -68,28 +112,33 @@
 export default {
   data() {
     return {
-      currentPage: "debate", // 'debate' or 'chat'
-      activeTab: "debate", // inner tab
+      currentPage: "debate",
+      activeTab: "debate",
       messages: [
         "User1: Hello",
         "User2: Welcome",
         "User1: Let's debate this topic..."
       ],
       newMessage: "",
+      sessionId: null,
       toggles: {
-        gv: { label: "Genghis Khan", state: false },
+        gk: { label: "Genghis Khan", state: false },
         ks: { label: "Kim Jong Un", state: false },
         dt: { label: "George Washington", state: false },
-        gk: { label: "Donald Trump", state: false }
+        gv: { label: "Donald Trump", state: false }
       },
       maxLength: 0,
       rebuttles: 0
     };
   },
+  async mounted() {
+    this.scrollToBottom();
+    await this.startSession();
+  },
+  updated() {
+    this.scrollToBottom();
+  },
   methods: {
-    stopDebate() {
-      alert("Debate stopped.");
-    },
     scrollToBottom() {
       this.$nextTick(() => {
         const box = this.$refs.scrollBox;
@@ -101,19 +150,56 @@ export default {
         }
       });
     },
-    sendMessage() {
-      const text = this.newMessage.trim();
-      if (text) {
-        this.messages.push(`User${this.messages.length + 1}: ${text}`);
-        this.newMessage = "";
+    async startSession() {
+      try {
+        const res = await fetch("http://127.0.0.1:5000/start_session/", {
+          method: "POST"
+        });
+        const data = await res.json();
+        this.sessionId = data.session_id;
+      } catch (error) {
+        console.error("Failed to start session:", error);
       }
+    },
+    async sendToPersona(userMessage, personaName) {
+      try {
+        const res = await fetch("http://127.0.0.1:5000/message/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            session_id: this.sessionId,
+            user_message: userMessage,
+            persona_name: personaName.toLowerCase().replace(/ /g, "_")
+          })
+        });
+        const data = await res.json();
+        return data.reply;
+      } catch (error) {
+        console.error(`Error with ${personaName}:`, error);
+        return "(No response)";
+      }
+    },
+    async sendMessage() {
+      const text = this.newMessage.trim();
+      if (!text) return;
+
+      this.messages.push(`User: ${text}`);
+      this.newMessage = "";
+
+      const active = Object.values(this.toggles)
+        .filter(val => val.state)
+        .map(val => val.label);
+
+      for (const persona of active) {
+        const reply = await this.sendToPersona(text, persona);
+        this.messages.push(`${persona}: ${reply}`);
+      }
+    },
+    stopDebate() {
+      alert("Debate stopped.");
     }
-  },
-  updated() {
-    this.scrollToBottom();
-  },
-  mounted() {
-    this.scrollToBottom();
   }
 };
 </script>
@@ -125,13 +211,10 @@ export default {
   padding: 20px;
   font-family: Arial, sans-serif;
 }
-
 .title {
   text-align: center;
   margin-bottom: 15px;
 }
-
-/* Tabs */
 .tabs {
   display: flex;
   justify-content: center;
@@ -153,13 +236,6 @@ export default {
   background: #4caf50;
   color: white;
 }
-
-.inner-tabs {
-  max-width: 300px;
-  margin: auto;
-}
-
-/* Scrollable Box */
 .scroll-box {
   height: 300px;
   overflow-y: auto;
@@ -170,8 +246,6 @@ export default {
 .message {
   margin: 5px 0;
 }
-
-/* Message Input */
 .message-input {
   display: flex;
   margin-top: 8px;
@@ -193,8 +267,6 @@ export default {
 .message-input button:hover {
   background: #45a049;
 }
-
-/* Toggles */
 .controls {
   display: flex;
   justify-content: space-around;
@@ -216,8 +288,6 @@ export default {
   background: #4caf50;
   color: white;
 }
-
-/* Settings */
 .settings {
   display: flex;
   justify-content: space-around;
@@ -231,8 +301,6 @@ export default {
   width: 60px;
   margin-left: 5px;
 }
-
-/* Stop Button */
 .stop-btn {
   display: block;
   margin: 20px auto;
@@ -244,8 +312,6 @@ export default {
   cursor: pointer;
   border-radius: 5px;
 }
-
-/* Animations */
 .fade-slide-enter-active,
 .fade-slide-leave-active {
   transition: all 0.4s ease;
@@ -258,7 +324,6 @@ export default {
   opacity: 0;
   transform: translateY(-20px);
 }
-
 .fade-scale-enter-active,
 .fade-scale-leave-active {
   transition: all 0.3s ease;
