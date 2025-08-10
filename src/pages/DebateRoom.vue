@@ -39,8 +39,38 @@
                 v-for="(msg, index) in messages"
                 :key="index"
                 class="message"
+                :class="historical_figures.some(f => f.id === msg.sender) ? 'bot' : 'user'"
               >
-                {{ msg }}
+                <div class="avatar">
+                  <img
+                    v-if="msg.sender === 'Genghis Khan'"
+                    src="@/assets/avatars/genghis_avatar.png"
+                  >
+                  <img
+                    v-else-if="msg.sender === 'Kim Jong Un'"
+                    src="@/assets/avatars/kim_avatar.png"
+                  >
+                  <img
+                    v-else-if="msg.sender === 'George Washington'"
+                    src="@/assets/avatars/george_avatar.png"
+                  >
+                  <img
+                    v-else-if="msg.sender === 'Donald Trump'"
+                    src="@/assets/avatars/don_avatar.png"
+                  >
+                  <img
+                    v-else
+                    src="@/assets/avatars/user_avatar.png"
+                  >
+                </div>
+                <div class="bubble">
+                  <div class="name">
+                    {{ msg.sender }}
+                  </div>
+                  <div class="text">
+                    {{ msg.text }}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -115,17 +145,22 @@ export default {
       currentPage: "debate",
       activeTab: "debate",
       messages: [
-        "User1: Hello",
-        "User2: Welcome",
-        "User1: Let's debate this topic..."
+        { sender: "BOT", text: "Here is an example message"},
+        { sender: "User", text: "I sent something" }
+      ],
+      historical_figures: [
+        { id: "Genghis Khan"},
+        { id: "Kim Jong Un"}, 
+        { id: "George Washington"},
+        { id: "Donald Trump"}
       ],
       newMessage: "",
       sessionId: null,
       toggles: {
         gk: { label: "Genghis Khan", state: false },
-        ks: { label: "Kim Jong Un", state: false },
-        dt: { label: "George Washington", state: false },
-        gv: { label: "Donald Trump", state: false }
+        kj: { label: "Kim Jong Un", state: false },
+        gw: { label: "George Washington", state: false },
+        dt: { label: "Donald Trump", state: false }
       },
       maxLength: 0,
       rebuttles: 0
@@ -185,7 +220,8 @@ export default {
       const text = this.newMessage.trim();
       if (!text) return;
 
-      this.messages.push(`User: ${text}`);
+      // Push user message
+      this.messages.push({ sender: "You", text});
       this.newMessage = "";
 
       const active = Object.values(this.toggles)
@@ -194,7 +230,7 @@ export default {
 
       for (const persona of active) {
         const reply = await this.sendToPersona(text, persona);
-        this.messages.push(`${persona}: ${reply}`);
+        this.messages.push({ sender: persona, text: reply});
       }
     },
     stopDebate() {
@@ -336,4 +372,65 @@ export default {
   opacity: 0;
   transform: scale(0.95);
 }
+.scroll-box {
+  height: 300px;
+  overflow-y: auto;
+  background: #f5f5f5;
+  padding: 10px;
+}
+
+.message {
+  display: flex;
+  align-items: flex-end;
+  margin-bottom: 10px;
+}
+
+.message.bot {
+  flex-direction: row;
+}
+
+.message.user {
+  flex-direction: row-reverse;
+}
+
+.avatar img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+.bubble {
+  max-width: 60%;
+  padding: 8px 12px;
+  border-radius: 10px;
+  margin: 0 8px;
+}
+
+.bot .bubble {
+  background-color: #e5e5ea;
+  color: #000;
+}
+
+.user .bubble {
+  background-color: #1e90ff;
+  color: #fff;
+}
+
+.name {
+  font-weight: bold;
+  font-size: 0.85em;
+  margin-bottom: 3px;
+}
+
+.text {
+  font-size: 1em;
+}
+
+.time {
+  font-size: 0.75em;
+  opacity: 0.7;
+  margin-top: 4px;
+  text-align: right;
+}
+
 </style>

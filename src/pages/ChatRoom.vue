@@ -1,7 +1,9 @@
 <template>
   <div class="room-container">
-    <h1 class="room-title">Chat Room</h1>
-    <ChatBox :initialMessages="sampleMessages" />
+    <h1 class="room-title">
+      Chat Room
+    </h1>
+    <ChatBox :initial-messages="sampleMessages" />
   </div>
 </template>
 
