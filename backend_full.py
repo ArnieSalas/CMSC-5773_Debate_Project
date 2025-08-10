@@ -13,7 +13,7 @@ from typing import List, Dict, Any
 # ===============================
 # Config: vLLM (OpenAI-compatible)
 # ===============================
-VLLM_BASE_URL = os.getenv("VLLM_BASE_URL", "https://kurt-obtain-hist-component.trycloudflare.com")  # <-- set your tunnel URL here or via env
+VLLM_BASE_URL = os.getenv("VLLM_BASE_URL", "https://cheese-earrings-brother-pn.trycloudflare.com")  # <-- set your tunnel URL here or via env
 VLLM_API_KEY  = os.getenv("VLLM_API_KEY", "sk-local")  # vLLM ignores it; some clients require a key
 MODEL_ID      = os.getenv("VLLM_MODEL", "hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4")
 
@@ -78,9 +78,12 @@ def store_message(db, session_id: int, sender: str, content: str):
     db.commit()
     return msg
 
-def get_history(db, session_id: int, limit=10):
+def get_history(db, session_id: int, limit=5):
     msgs = db.query(Message).filter(Message.session_id == session_id).order_by(Message.timestamp).limit(limit).all()
     return [(m.sender, m.content) for m in msgs]
+
+def truncate_message(message: str, max_tokens: int = 500) -> str:
+    return message[:max_tokens]
 
 def load_persona(name):
     filename = os.path.join("personas", f"{name.lower()}.json")
@@ -162,6 +165,7 @@ async def call_vllm_chat(messages: List[Dict[str, str]], temperature: float = 0.
 
 # --- API Endpoints ---
 @app.post("/message/")
+
 async def send_message(input: MessageInput):
     db = next(get_db())
 
@@ -171,17 +175,18 @@ async def send_message(input: MessageInput):
         raise HTTPException(status_code=404, detail="Session not found.")
 
     # Store user message
-    store_message(db, input.session_id, "user", input.user_message)
+    user_message = truncate_message(input.user_message)  # Truncate the user message
+    store_message(db, input.session_id, "user", user_message)
 
     # Load persona and conversation history
     persona = load_persona(input.persona_name)
     history = get_history(db, input.session_id)
 
     # Build chat messages for the model
-    messages = build_chat_messages(persona, history, input.user_message)
+    messages = build_chat_messages(persona, history, user_message)
 
-    # Call the model
-    bot_reply = await call_vllm_chat(messages, temperature=0.6, max_tokens=512)
+    # Call the model with reduced max_tokens
+    bot_reply = await call_vllm_chat(messages, temperature=0.6, max_tokens=256)  # Reduced max_tokens
 
     # Store bot message
     store_message(db, input.session_id, "bot", bot_reply)
@@ -194,6 +199,7 @@ async def send_message(input: MessageInput):
         "model": MODEL_ID,
         "session_id": input.session_id,
     }
+
 @app.post("/start_session/")
 def start_session():
     db = next(get_db())
