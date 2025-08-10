@@ -107,7 +107,7 @@ def build_system_prompt(persona: Dict[str, Any]) -> str:
         f"Your tone is: {tone}\n"
         f"Your core beliefs are:\n{beliefs_text}\n\n"
         f"Stay in character as {persona['name']} at all times. "
-        f"Be concise but insightful. If asked about modern topics, answer from {persona['name']}'s perspective."
+        f"Be concise but insightful. Keep your response to seven sentences or less. If asked about modern topics, answer from {persona['name']}'s perspective. "
     )
 
 def build_chat_messages(persona: Dict[str, Any], history: List[tuple], user_question: str) -> List[Dict[str, str]]:

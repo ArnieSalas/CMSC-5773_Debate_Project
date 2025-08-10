@@ -84,7 +84,7 @@
             placeholder="Type a message..."
             @keyup.enter="sendMessage"
           >
-          <button @click="sendMessage">
+          <button :disabled="isDisabled" @click="handleMessageSend">
             Send
           </button>
         </div>
@@ -108,20 +108,20 @@
 
         <!-- Settings -->
         <div class="settings">
-          <label>
-            Max Length:
-            <input
-              v-model="maxLength"
-              type="number"
-            >
-          </label>
-
           <label v-if="currentPage === 'debate'">
             # Rebuttles:
+            <!-- Slider for Rebuttles with increased size -->
             <input
               v-model="rebuttles"
-              type="number"
+              type="range"
+              min="0"
+              max="10"
+              step="1"
+              @input="updateRebuttlesDisplay"
+              class="rebuttles-slider"
             >
+            <!-- Display the current value of the slider -->
+            <span>{{ rebuttles }}</span>
           </label>
         </div>
 
@@ -161,6 +161,7 @@ export default {
       },
       maxLength: 0,
       rebuttles: 0,
+      isDisabled: false,
       lastBotReplied: null // Track who last replied
     };
   },
@@ -172,6 +173,14 @@ export default {
     this.scrollToBottom();
   },
   methods: {
+    handleMessageSend() {
+      if (this.currentPage === "debate") {
+        this.sendMessage();
+      }
+      else if (this.currentPage === "chat") {
+        this.sendChatMessage();
+      }
+    },
     scrollToBottom() {
       this.$nextTick(() => {
         const box = this.$refs.scrollBox;
@@ -182,6 +191,10 @@ export default {
           });
         }
       });
+    },
+    updateRebuttlesDisplay() {
+      // Optionally update any other properties or perform actions on input change
+      console.log(`Rebuttles set to: ${this.rebuttles}`);
     },
     async startSession() {
       try {
@@ -214,52 +227,64 @@ export default {
         return "(No response)";
       }
     },
-    async sendMessage() {
+    async sendChatMessage() {
       const text = this.newMessage.trim();
-      let rebut = this.rebuttles
       if (!text) return;
 
       // Push user message
-      this.messages.push({ sender: "You", text });
+      this.messages.push({ sender: "You", text});
       this.newMessage = "";
 
-      // Get active personas
       const active = Object.values(this.toggles)
         .filter(val => val.state)
         .map(val => val.label);
 
-      // If no bots are selected, exit
+      for (const persona of active) {
+        const reply = await this.sendToPersona(text, persona);
+        this.messages.push({ sender: persona, text: reply});
+      }
+    },
+    async sendMessage() {
+      const text = this.newMessage.trim();
+      let rebut = this.rebuttles
+      this.isDisabled = true;
+      if (!text) return;
+
+      this.messages.push({ sender: "You", text });
+      this.newMessage = "";
+
+      const active = Object.values(this.toggles)
+        .filter(val => val.state)
+        .map(val => val.label);
+
       if (active.length === 0) {
         alert("Please select at least one persona.");
         return;
       }
 
       let currentMessage = text;
-      let botResponses = [];
 
       for (let i = 0; i < rebut; i++) {
         try {
       const nextBot = active[(this.lastBotReplied ? active.indexOf(this.lastBotReplied) + 1 : 0) % active.length];
 
       const botReply = await this.sendToPersona(currentMessage, nextBot);
-      botResponses.push({ sender: nextBot, text: botReply });
+      this.messages.push({ sender: nextBot, text: botReply });
 
       currentMessage = botReply;
       this.lastBotReplied = nextBot;
 
-      await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay between bots
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       this.lastBotReplied = nextBot;
 
     } catch (error) {
       console.error("Error during bot response cycle:", error);
+      this.isDisabled = false;
       break;
     }
       }
-
-      this.messages.push(...botResponses);
-
-      ++rebut;
+      this.isDisabled = false;
     },
     stopDebate() {
       alert("Debate stopped.");
