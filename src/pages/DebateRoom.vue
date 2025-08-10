@@ -84,7 +84,7 @@
             placeholder="Type a message..."
             @keyup.enter="sendMessage"
           >
-          <button @click="sendMessage">
+          <button @click="currentPage === 'debate' ? autoDebate() : sendMessage()">
             Send
           </button>
         </div>
@@ -235,6 +235,38 @@ export default {
     },
     stopDebate() {
       alert("Debate stopped.");
+    },
+
+    async autoDebate() {
+      const active = Object.values(this.toggles)
+        .filter(val => val.state)
+        .map(val => val.label.toLowerCase().replace(/ /g, "_"));
+
+      if (active.length < 2) {
+        alert("Select at least two personas for a debate!");
+        return;
+      }
+
+    try {
+      const res = await fetch("http://127.0.0.1:5000/debate/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: this.sessionId,
+          starting_message: this.newMessage.trim(),
+          persona_list: active,
+          rounds: this.rebuttles || 3
+        })
+      });
+
+      const data = await res.json();
+      for (const turn of data.transcript) {
+        this.messages.push(`${turn.speaker}: ${turn.text}`);
+      }
+      this.newMessage = "";
+    } catch (error) {
+      console.error("Debate error:", error);
+    }
     }
   }
 };
