@@ -9,13 +9,13 @@
     <div class="tabs">
       <button
         :class="{ active: currentPage === 'debate' }"
-        @click="currentPage = 'debate'"
+        @click="changePage('debate')"
       >
         Debate Room
       </button>
       <button
         :class="{ active: currentPage === 'chat' }"
-        @click="currentPage = 'chat'"
+        @click="changePage('chat')"
       >
         Chat Room
       </button>
@@ -99,7 +99,7 @@
             <span>{{ option.label }}</span>
             <button
               :class="{ on: option.state }"
-              @click="option.state = !option.state"
+              @click="toggleButton(key)"
             >
               {{ option.state ? 'ON' : 'OFF' }}
             </button>
@@ -144,15 +144,12 @@ export default {
     return {
       currentPage: "debate",
       activeTab: "debate",
-      messages: [
-        { sender: "BOT", text: "Here is an example message"},
-        { sender: "User", text: "I sent something" }
-      ],
+      messages: [],
       historical_figures: [
-        { id: "Genghis Khan"},
-        { id: "Kim Jong Un"}, 
-        { id: "George Washington"},
-        { id: "Donald Trump"}
+        { id: "Genghis Khan" },
+        { id: "Kim Jong Un" }, 
+        { id: "George Washington" },
+        { id: "Donald Trump" }
       ],
       newMessage: "",
       sessionId: null,
@@ -163,7 +160,8 @@ export default {
         dt: { label: "Donald Trump", state: false }
       },
       maxLength: 0,
-      rebuttles: 0
+      rebuttles: 0,
+      lastBotReplied: null // Track who last replied
     };
   },
   async mounted() {
@@ -206,7 +204,7 @@ export default {
           body: JSON.stringify({
             session_id: this.sessionId,
             user_message: userMessage,
-            persona_name: personaName.toLowerCase().replace(/ /g, "_")
+            persona_name: personaName.toLowerCase().replace(/ /g, "_"),
           })
         });
         const data = await res.json();
@@ -218,31 +216,82 @@ export default {
     },
     async sendMessage() {
       const text = this.newMessage.trim();
+      let rebut = this.rebuttles
       if (!text) return;
 
       // Push user message
-      this.messages.push({ sender: "You", text});
+      this.messages.push({ sender: "You", text });
       this.newMessage = "";
 
+      // Get active personas
       const active = Object.values(this.toggles)
         .filter(val => val.state)
         .map(val => val.label);
 
-      for (const persona of active) {
-        const reply = await this.sendToPersona(text, persona);
-        this.messages.push({ sender: persona, text: reply});
+      // If no bots are selected, exit
+      if (active.length === 0) {
+        alert("Please select at least one persona.");
+        return;
       }
+
+      let currentMessage = text;
+      let botResponses = [];
+
+      for (let i = 0; i < rebut; i++) {
+        try {
+      const nextBot = active[(this.lastBotReplied ? active.indexOf(this.lastBotReplied) + 1 : 0) % active.length];
+
+      const botReply = await this.sendToPersona(currentMessage, nextBot);
+      botResponses.push({ sender: nextBot, text: botReply });
+
+      currentMessage = botReply;
+      this.lastBotReplied = nextBot;
+
+      await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay between bots
+
+      this.lastBotReplied = nextBot;
+
+    } catch (error) {
+      console.error("Error during bot response cycle:", error);
+      break;
+    }
+      }
+
+      this.messages.push(...botResponses);
+
+      ++rebut;
     },
     stopDebate() {
       alert("Debate stopped.");
+    },
+    toggleButton(key) {
+      if (this.currentPage === 'chat') {
+        Object.keys(this.toggles).forEach(k => {
+          this.toggles[k].state = false;
+        });
+        this.toggles[key].state = true;
+      } else {
+        this.toggles[key].state = !this.toggles[key].state;
+      }
+    },
+    changePage(page) {
+      this.currentPage = page;
+      this.resetToggles();
+    },
+    resetToggles() {
+      Object.keys(this.toggles).forEach(key => {
+        this.toggles[key].state = false;
+      });
     }
   }
 };
 </script>
 
+
 <style scoped>
 .page-container {
   max-width: 700px;
+  background-image: url("../assets/chat_background.jpg");
   margin: auto;
   padding: 20px;
   font-family: Arial, sans-serif;
@@ -276,7 +325,7 @@ export default {
   height: 300px;
   overflow-y: auto;
   background: #f8f8f8;
-  border: 1px solid #ccc;
+  border: 1px solid #cccccc;
   padding: 10px;
 }
 .message {
@@ -289,7 +338,7 @@ export default {
 .message-input input {
   flex: 1;
   padding: 8px;
-  border: 1px solid #ccc;
+  border: 1px solid #cccccc;
   border-right: none;
   outline: none;
 }
