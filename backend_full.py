@@ -6,6 +6,15 @@ from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 import json
 import os
+import httpx
+from typing import List, Dict, Any
+
+# ===============================
+# Config: vLLM (OpenAI-compatible)
+# ===============================
+VLLM_BASE_URL = os.getenv("VLLM_BASE_URL", "https://ate-uses-beaver-techrepublic.trycloudflare.com/")  # <-- set your tunnel URL here or via env
+VLLM_API_KEY  = os.getenv("VLLM_API_KEY", "sk-local")  # vLLM ignores it; some clients require a key
+MODEL_ID      = os.getenv("VLLM_MODEL", "hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4")
 
 # --- SQLAlchemy setup ---
 DATABASE_URL = "sqlite:///./chat.db"
@@ -79,32 +88,80 @@ def load_persona(name):
     with open(filename, "r", encoding="utf-8") as f:
         return json.load(f)
 
-def build_prompt(persona, history, user_question):
-    history_text = "\n".join([f"{sender.capitalize()}: {text}" for sender, text in history])
-    
-    # Combine beliefs for the prompt
+def build_system_prompt(persona: Dict[str, Any]) -> str:
     beliefs = persona["beliefs"]
-    beliefs_text = "\n- Political: " + beliefs["political"]
-    beliefs_text += "\n- Freedom: " + beliefs["freedom"]
-    beliefs_text += "\n- War: " + beliefs["war"]
-    beliefs_text += "\n- Government: " + beliefs["government"]
-    beliefs_text += "\n- Values: " + beliefs["values"]
+    tone = persona["style"]["tone"]
+    beliefs_text = (
+        f"- Political: {beliefs['political']}\n"
+        f"- Freedom: {beliefs['freedom']}\n"
+        f"- War: {beliefs['war']}\n"
+        f"- Government: {beliefs['government']}\n"
+        f"- Values: {beliefs['values']}"
+    )
+    return (
+        f"You are {persona['name']}, a historical figure.\n"
+        f"Your tone is: {tone}\n"
+        f"Your core beliefs are:\n{beliefs_text}\n\n"
+        f"Stay in character as {persona['name']} at all times. "
+        f"Be concise but insightful. If asked about modern topics, answer from {persona['name']}'s perspective."
+    )
 
-    prompt = f"""You are {persona['name']}, a historical figure.
-Your tone is: {persona['style']['tone']}
-Your core beliefs are:{beliefs_text}
+def build_chat_messages(persona: Dict[str, Any], history: List[tuple], user_question: str) -> List[Dict[str, str]]:
+    """
+    Convert DB history to OpenAI-style chat messages.
+    History contains tuples of (sender: 'user'|'bot', content).
+    """
+    msgs: List[Dict[str, str]] = []
+    # System prompt (persona)
+    msgs.append({"role": "system", "content": build_system_prompt(persona)})
 
-Conversation history:
-{history_text}
+    # Replay history
+    for sender, content in history:
+        if sender == "user":
+            msgs.append({"role": "user", "content": content})
+        else:
+            # bot messages become assistant replies (in persona voice)
+            msgs.append({"role": "assistant", "content": content})
 
-User: {user_question}
-{persona['name']}: """
-    
-    return prompt
+    # Current user input
+    msgs.append({"role": "user", "content": user_question})
+    return msgs
+
+async def call_vllm_chat(messages: List[Dict[str, str]], temperature: float = 0.6, max_tokens: int = 512) -> str:
+    """
+    Call your vLLM server's OpenAI-compatible /v1/chat/completions endpoint.
+    """
+    url = f"{VLLM_BASE_URL}/v1/chat/completions"
+    payload = {
+        "model": MODEL_ID,
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+    }
+    headers = {
+        "Authorization": f"Bearer {VLLM_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    timeout = httpx.Timeout(60.0, connect=10.0)
+
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        r = await client.post(url, headers=headers, json=payload)
+        try:
+            r.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            # Surface model errors in a readable way
+            detail = e.response.text
+            raise HTTPException(status_code=502, detail=f"LLM error: {detail}")
+
+        data = r.json()
+        try:
+            return data["choices"][0]["message"]["content"]
+        except Exception:
+            raise HTTPException(status_code=502, detail=f"Unexpected LLM response: {data}")
 
 # --- API Endpoints ---
 @app.post("/message/")
-def send_message(input: MessageInput):
+async def send_message(input: MessageInput):
     db = next(get_db())
 
     # Validate session
@@ -119,17 +176,45 @@ def send_message(input: MessageInput):
     persona = load_persona(input.persona_name)
     history = get_history(db, input.session_id)
 
-    # Build prompt (use your LLM here instead of dummy reply)
-    prompt = build_prompt(persona, history, input.user_message)
+    # Build chat messages for the model
+    messages = build_chat_messages(persona, history, input.user_message)
 
-    # Dummy bot reply (replace with model call)
-    bot_reply = f"(Pretend I am {persona['name']}) That's a profound question."
+    # Call the model
+    bot_reply = await call_vllm_chat(messages, temperature=0.6, max_tokens=512)
+
+    # Store bot message
     store_message(db, input.session_id, "bot", bot_reply)
 
-    return {"prompt_used": prompt, "reply": bot_reply}
+    return {
+        "reply": bot_reply,
+        "model": MODEL_ID,
+        "session_id": input.session_id,
+    }
 
 @app.post("/start_session/")
 def start_session():
     db = next(get_db())
     session = create_session(db)
     return {"session_id": session.id}
+
+@app.get("/health")
+async def health():
+    """Check DB and vLLM health."""
+    # DB ping
+    try:
+        _ = next(get_db())
+        db_ok = True
+    except Exception:
+        db_ok = False
+
+    # vLLM ping
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            r = await client.get(f"{VLLM_BASE_URL}/health")
+            vllm_ok = r.status_code == 200
+            vllm_info = r.json() if vllm_ok else {"status": "down"}
+    except Exception as e:
+        vllm_ok = False
+        vllm_info = {"error": str(e)}
+
+    return {"db_ok": db_ok, "vllm_ok": vllm_ok, "vllm": vllm_info}
