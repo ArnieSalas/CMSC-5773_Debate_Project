@@ -13,7 +13,7 @@ from typing import List, Dict, Any
 # ===============================
 # Config: vLLM (OpenAI-compatible)
 # ===============================
-VLLM_BASE_URL = os.getenv("VLLM_BASE_URL", "https://cheese-earrings-brother-pn.trycloudflare.com")  # <-- set your tunnel URL here or via env
+VLLM_BASE_URL = os.getenv("VLLM_BASE_URL", "https://december-dx-mf-insulation.trycloudflare.com")  # <-- set your tunnel URL here or via env
 VLLM_API_KEY  = os.getenv("VLLM_API_KEY", "sk-local")  # vLLM ignores it; some clients require a key
 MODEL_ID      = os.getenv("VLLM_MODEL", "hugging-quants/Meta-Llama-3.1-8B-Instruct-AWQ-INT4")
 
@@ -92,43 +92,79 @@ def load_persona(name):
     with open(filename, "r", encoding="utf-8") as f:
         return json.load(f)
 
-def build_system_prompt(persona: Dict[str, Any]) -> str:
+def build_identity_messages(persona: Dict[str, Any]) -> List[Dict[str, str]]:
+    """Return multiple system messages to lock in the role/persona."""
     beliefs = persona["beliefs"]
     tone = persona["style"]["tone"]
-    beliefs_text = (
-        f"- Political: {beliefs['political']}\n"
-        f"- Freedom: {beliefs['freedom']}\n"
-        f"- War: {beliefs['war']}\n"
-        f"- Government: {beliefs['government']}\n"
-        f"- Values: {beliefs['values']}"
-    )
-    return (
-        f"You are {persona['name']}, a historical figure.\n"
-        f"Your tone is: {tone}\n"
-        f"Your core beliefs are:\n{beliefs_text}\n\n"
-        f"Stay in character as {persona['name']} at all times. "
-        f"Be concise but insightful. Keep your response to seven sentences or less. If asked about modern topics, answer from {persona['name']}'s perspective. "
-    )
+
+    return [
+        {
+            "role": "system",
+            "content": (
+                f"You are roleplaying as {persona['name']}, a historical figure. "
+                "You are NOT an AI model. You are {persona['name']} and will never break character. "
+                "You respond ONLY as this figure, speaking in their voice, values, and tone. "
+                "Do not ever acknowledge or refer to yourself as an AI or anything other than the character you are portraying."
+            )
+        },
+        {
+            "role": "system",
+            "content": (
+                f"Character Sheet:\n"
+                f"Name: {persona['name']}\n"
+                f"Tone: {tone}\n"
+                f"Core Beliefs:\n"
+                f"- Political: {beliefs['political']}\n"
+                f"- Freedom: {beliefs['freedom']}\n"
+                f"- War: {beliefs['war']}\n"
+                f"- Government: {beliefs['government']}\n"
+                f"- Values: {beliefs['values']}"
+            )
+        },
+        {
+            "role": "system",
+            "content": (
+                "Debate Rules:\n"
+                "1. Speak in 7 sentences or less.\n"
+                "2. Always address the audience as 'audience'.\n"
+                "3. If asked about modern topics, respond as this historical figure would have, "
+                "based on their values and worldview. Never break character and always stay true to the historical persona."
+            )
+        }
+    ]
+
+def clean_user_message(message: str) -> str:
+    """Remove meta/moderator phrasing from the user message."""
+    # Simple example — you could make this smarter
+    unwanted_prefixes = ["Moderator:", "System:", "Instruction:"]
+    for prefix in unwanted_prefixes:
+        if message.startswith(prefix):
+            message = message[len(prefix):].strip()
+    return message
 
 def build_chat_messages(persona: Dict[str, Any], history: List[tuple], user_question: str) -> List[Dict[str, str]]:
-    """
-    Convert DB history to OpenAI-style chat messages.
-    History contains tuples of (sender: 'user'|'bot', content).
-    """
+    """Convert DB history to OpenAI-style chat messages while keeping persona consistent."""
     msgs: List[Dict[str, str]] = []
-    # System prompt (persona)
-    msgs.append({"role": "system", "content": build_system_prompt(persona)})
 
-    # Replay history
+    # Add multi-part system setup
+    msgs.extend(build_identity_messages(persona))
+
+    # Replay only dialogue history (no system/meta)
     for sender, content in history:
         if sender == "user":
-            msgs.append({"role": "user", "content": content})
-        else:
-            # bot messages become assistant replies (in persona voice)
+            msgs.append({"role": "user", "content": clean_user_message(content)})
+        elif sender == "bot":
             msgs.append({"role": "assistant", "content": content})
 
-    # Current user input
-    msgs.append({"role": "user", "content": user_question})
+    # Add short identity reminder before latest user message
+    msgs.append({
+        "role": "system",
+        "content": f"Reminder: You are {persona['name']}, speaking only in their historical voice."
+    })
+
+    # Add current user input (cleaned)
+    msgs.append({"role": "user", "content": clean_user_message(user_question)})
+
     return msgs
 
 async def call_vllm_chat(messages: List[Dict[str, str]], temperature: float = 0.6, max_tokens: int = 512) -> str:
