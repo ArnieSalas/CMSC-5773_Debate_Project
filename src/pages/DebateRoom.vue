@@ -316,7 +316,21 @@ export default {
       this.shouldStop = true;
     },
     toggleButton(key) {
-      if (this.currentPage === 'chat') {
+      // If the current page is 'debate' (not chat), ensure only two active buttons.
+      if (this.currentPage === 'debate') {
+        const activeKeys = Object.keys(this.toggles).filter(k => this.toggles[k].state);
+        
+        // If there are already two active buttons and the current key isn't already active, deselect the oldest active one.
+        if (activeKeys.length >= 2 && !this.toggles[key].state) {
+          // Find the first active button and deactivate it
+          const firstActiveKey = activeKeys[0];
+          this.toggles[firstActiveKey].state = false;
+        }
+
+        // Toggle the selected button's state
+        this.toggles[key].state = !this.toggles[key].state;
+      }
+      else if (this.currentPage === 'chat') {
         Object.keys(this.toggles).forEach(k => {
           this.toggles[k].state = false;
         });
@@ -439,14 +453,15 @@ export default {
 }
 .controls {
   display: flex;
-  justify-content: space-around;
-  margin: 15px 0;
+  flex-wrap: wrap;   /* Allow the buttons to wrap into new lines */
+  gap: 10px;         /* Add some space between buttons */
+  justify-content: flex-start;
 }
 .toggle {
+  flex: 1 1 calc(25% - 10px);  /* Allow the toggle buttons to take up 25% of the container's width (minus gap) */
   display: flex;
-  flex-direction: column; /* stack name above button */
-  align-items: center;    /* center horizontally */
-  gap: 0.25rem;           /* space between text and button */
+  flex-direction: column;  /* Stack the label and button vertically */
+  align-items: center;
 }
 .toggle button {
   display: block;
