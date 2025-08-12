@@ -68,7 +68,7 @@
                   >
                   <img
                     v-else-if="msg.sender === 'Cleopatra'"
-                    src="@/assets/avatars/cleopatradon_avatar.png"
+                    src="@/assets/avatars/cleopatra_avatar.png"
                   >
                   <img
                     v-else-if="msg.sender === 'Albert Einstein'"
@@ -107,7 +107,7 @@
             v-model="newMessage"
             type="text"
             placeholder="Type a message..."
-            @keyup.enter="sendMessage"
+            @keyup.enter="handleMessageSend"
           >
           <button :disabled="isDisabled" @click="handleMessageSend">
             Send
@@ -139,8 +139,8 @@
             <input
               v-model="rebuttles"
               type="range"
-              min="0"
-              max="20"
+              min="4"
+              max="50"
               step="1"
               @input="updateRebuttlesDisplay"
               class="rebuttles-slider"
@@ -196,7 +196,7 @@ export default {
         mg: { label: "Mahatma Gandhi", state: false }
       },
       maxLength: 0,
-      rebuttles: 0,
+      rebuttles: 4,
       isDisabled: false,
       lastBotReplied: null, // Track who last replied
       shouldStop: false
@@ -335,21 +335,7 @@ export default {
       this.shouldStop = true;
     },
     toggleButton(key) {
-      // If the current page is 'debate' (not chat), ensure only two active buttons.
-      if (this.currentPage === 'debate') {
-        const activeKeys = Object.keys(this.toggles).filter(k => this.toggles[k].state);
-        
-        // If there are already two active buttons and the current key isn't already active, deselect the oldest active one.
-        if (activeKeys.length >= 2 && !this.toggles[key].state) {
-          // Find the first active button and deactivate it
-          const firstActiveKey = activeKeys[0];
-          this.toggles[firstActiveKey].state = false;
-        }
-
-        // Toggle the selected button's state
-        this.toggles[key].state = !this.toggles[key].state;
-      }
-      else if (this.currentPage === 'chat') {
+      if (this.currentPage === 'chat') {
         Object.keys(this.toggles).forEach(k => {
           this.toggles[k].state = false;
         });
@@ -473,7 +459,7 @@ export default {
 .controls {
   display: flex;
   flex-wrap: wrap;   /* Allow the buttons to wrap into new lines */
-  gap: 10px;         /* Add some space between buttons */
+  gap: 40px;         /* Add some space between buttons */
   justify-content: flex-start;
 }
 .toggle {
@@ -501,12 +487,14 @@ export default {
   justify-content: space-around;
   margin: 15px 0;
 }
+
 .settings label {
   display: flex;
   align-items: center;
 }
-.settings input {
-  width: 60px;
+
+.settings input[type="range"] {
+  width: 300px; /* Adjust the width of the slider */
   margin-left: 5px;
 }
 .stop-btn {
