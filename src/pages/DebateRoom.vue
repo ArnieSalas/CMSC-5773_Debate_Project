@@ -1,5 +1,5 @@
 
-<template>
+<template style="background">
   <div class="page-container">
     <h1 class="title">
       {{ currentPage === 'debate' ? 'Debate Room' : 'Chat Room' }}
@@ -109,13 +109,13 @@
         <!-- Settings -->
         <div class="settings">
           <label v-if="currentPage === 'debate'">
-            # Rebuttles:
+            Total Number of Responses:
             <!-- Slider for Rebuttles with increased size -->
             <input
               v-model="rebuttles"
               type="range"
               min="0"
-              max="10"
+              max="20"
               step="1"
               @input="updateRebuttlesDisplay"
               class="rebuttles-slider"
@@ -124,7 +124,6 @@
             <span>{{ rebuttles }}</span>
           </label>
         </div>
-
         <!-- Stop button -->
         <button
           v-if="currentPage === 'debate'"
@@ -162,7 +161,8 @@ export default {
       maxLength: 0,
       rebuttles: 0,
       isDisabled: false,
-      lastBotReplied: null // Track who last replied
+      lastBotReplied: null, // Track who last replied
+      shouldStop: false
     };
   },
   async mounted() {
@@ -228,6 +228,7 @@ export default {
       }
     },
     async sendChatMessage() {
+      this.shouldStop = false;
       const text = this.newMessage.trim();
       if (!text) return;
 
@@ -245,6 +246,7 @@ export default {
       }
     },
     async sendMessage() {
+      this.shouldStop = false;
       const text = this.newMessage.trim();
       let rebut = this.rebuttles
       this.isDisabled = true;
@@ -259,6 +261,7 @@ export default {
 
       if (active.length === 0) {
         alert("Please select at least one persona.");
+        this.isDisabled = false;
         return;
       }
 
@@ -266,6 +269,10 @@ export default {
 
       for (let i = 0; i < rebut; i++) {
         try {
+          
+          if(this.shouldStop == true) {
+            break;
+          }
       const nextBot = active[(this.lastBotReplied ? active.indexOf(this.lastBotReplied) + 1 : 0) % active.length];
 
       const botReply = await this.sendToPersona(currentMessage, nextBot);
@@ -288,6 +295,7 @@ export default {
     },
     stopDebate() {
       alert("Debate stopped.");
+      this.shouldStop = true;
     },
     toggleButton(key) {
       if (this.currentPage === 'chat') {
@@ -300,8 +308,10 @@ export default {
       }
     },
     changePage(page) {
+      this.shouldStop = true;
       this.currentPage = page;
       this.resetToggles();
+      this.messages.length = 0;
     },
     resetToggles() {
       Object.keys(this.toggles).forEach(key => {
@@ -312,14 +322,41 @@ export default {
 };
 </script>
 
-
 <style scoped>
-.page-container {
-  max-width: 700px;
+:global(html, body, #app) {
+  height: 100%;
+  margin: 0;
+}
+
+:global(body) {
   background-image: url("../assets/chat_background.jpg");
-  margin: auto;
+  background-size: cover;      /* Fill the viewport */
+  background-position: center; /* Keep it centered */
+  background-repeat: no-repeat;
+  background-attachment: fixed; /* Optional: nice parallax when scrolling */
+}
+ .page-container {
+  width: min(980px, 100% - 32px);
+  margin: 32px auto;
   padding: 20px;
-  font-family: Arial, sans-serif;
+}
+.app-card {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  background: var(--bg-card);
+  border: 1px solid rgba(255,255,255,0.6);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+
+.background{
+  background-image: url("../assets/chat_background.jpg");
+  background-size: cover;   /* fills screen, keeps aspect ratio */
+  background-position: center;
+  background-repeat: no-repeat;
+  width: 100vw;
+  height: 100vh;
 }
 .title {
   text-align: center;
@@ -347,12 +384,17 @@ export default {
   color: white;
 }
 .scroll-box {
-  height: 300px;
-  overflow-y: auto;
+  min-height: 20vh;
+  max-height: 40vh;                         /* largest allowed */
+  height: auto;
+  overflow-y: auto;                       /* scroll once capped */
   background: #f8f8f8;
   border: 1px solid #cccccc;
   padding: 10px;
+  border-radius: 90px;
+  transition: max-height 0.2s ease;          /* smooth growth */
 }
+
 .message {
   margin: 5px 0;
 }
@@ -383,7 +425,10 @@ export default {
   margin: 15px 0;
 }
 .toggle {
-  text-align: center;
+  display: flex;
+  flex-direction: column; /* stack name above button */
+  align-items: center;    /* center horizontally */
+  gap: 0.25rem;           /* space between text and button */
 }
 .toggle button {
   display: block;
@@ -393,6 +438,7 @@ export default {
   border: none;
   cursor: pointer;
   border-radius: 4px;
+  min-width: 50px;
 }
 .toggle button.on {
   background: #4caf50;
@@ -446,12 +492,6 @@ export default {
   opacity: 0;
   transform: scale(0.95);
 }
-.scroll-box {
-  height: 300px;
-  overflow-y: auto;
-  background: #f5f5f5;
-  padding: 10px;
-}
 
 .message {
   display: flex;
@@ -461,10 +501,6 @@ export default {
 
 .message.bot {
   flex-direction: row;
-}
-
-.message.user {
-  flex-direction: row-reverse;
 }
 
 .avatar img {
@@ -505,6 +541,100 @@ export default {
   opacity: 0.7;
   margin-top: 4px;
   text-align: right;
+}
+
+/* changes input and send button, glows, ovals, etc */
+.message-input {
+  display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 12px 20px 20px;
+}
+.message-input input {
+  padding: 12px 14px; border-radius: 999px; border: 1px solid #e4e4e4; outline: none;
+  background: rgba(255,255,255,.9);
+  transition: box-shadow .2s ease, border-color .2s ease;
+}
+.message-input input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(63,191,111,.15);
+}
+.message-input button {
+  border: 0; padding: 12px 18px; border-radius: 999px; font-weight: 800; cursor: pointer;
+  color: white; box-shadow: 0 8px 24px rgba(63,191,111,.35);
+  transition: transform .12s ease, box-shadow .2s ease;
+}
+.message-input button:hover { transform: translateY(-1px); box-shadow: 0 10px 28px rgba(63,191,111,.45); }
+.message-input button:active { transform: translateY(0); }
+
+
+.message.user {
+  flex-direction: row-reverse;
+}
+/* This chunk adds the user's profile coming up in a smooth way as well as makes the input prittier */
+.message { display: flex; gap: 10px; margin: 8px 0; animation: pop .12s ease; }
+/* .message.user .bubble { flex-direction: row-reverse; background: #fff; border: 1px solid #eee; } */
+.message.bot .bubble  { background: #e9f9f0; border: 1px solid rgba(63,191,111,.25); }
+.bubble {
+  max-width: 72ch; padding: 10px 12px; border-radius: 14px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.05);
+  position: relative;
+}
+.message.user .bubble::after, .message.bot .bubble::after {
+  content: ""; position: absolute; bottom: -2px; width: 0; height: 0; border: 8px solid transparent;
+}
+/* .message.user .bubble::after { right: -2px; border-left-color: #eee; } */
+.message.bot  .bubble::after { left:  -2px; border-right-color: rgba(63,191,111,.25); }
+@keyframes pop { from { transform: translateY(4px); opacity: .0 } to { transform: none; opacity: 1 } }
+.name { font-weight: 700; margin-bottom: 2px; color: var(--text) }
+.text { color: var(--text); }
+.time { color: var(--text-muted); font-size: 12px; margin-top: 4px; }
+
+
+/* Room selection is rouned/ transitions better */
+.tabs {
+  display: grid; grid-template-columns: 1fr 1fr;
+  background: rgba(0,0,0,.05); padding: 6px; border-radius: 999px; gap: 6px; margin: 16px 20px;
+}
+.tabs button {
+  border: 0; padding: 10px 14px; border-radius: 999px; cursor: pointer;
+  background: transparent; font-weight: 700; transition: transform .15s ease, background .2s ease;
+}
+.tabs button:active { transform: scale(.98); }
+
+.toggle span {
+  font-weight: 600;
+  font-size: 1rem; /* tweak as needed */
+  color: #fff;     /* white text on your parchment background */
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.5); /* improves readability */
+}
+
+.settings label {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  font-size: 1rem;
+  color: #fff;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+}
+
+.settings input {
+  width: 60px;
+  margin-left: 5px;
+  border: none;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.title {
+  font-family: 'Poppins', sans-serif; /* Clean modern font */
+  font-size: 3rem;
+  font-weight: 700;
+  background: linear-gradient(90deg, #464746, #434943);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-align: center;
+  letter-spacing: 2px;
+  margin-bottom: 20px;
+  text-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+  animation: fadeInDown 0.6s ease-out;
 }
 
 </style>
