@@ -71,6 +71,19 @@
                     src="@/assets/avatars/cleopatradon_avatar.png"
                   >
                   <img
+                    v-else-if="msg.sender === 'Albert Einstein'"
+                    src="@/assets/avatars/albert_einstein_avatar.png"
+                  >
+                  <img
+                    v-else-if="msg.sender === 'Joan of Arc'"
+                    src="@/assets/avatars/joan_of_arc_avatar.png"
+                  >
+                  <img
+                    v-else-if="msg.sender === 'Mahatma Gandhi'"
+                    src="@/assets/avatars/mahatma_gandhi_avatar.png"
+
+                  >
+                  <img
                     v-else
                     src="@/assets/avatars/user_avatar.png"
                   >
@@ -163,7 +176,10 @@ export default {
         { id: "Donald Trump" },
         { id: "Julius Caesar" },
         { id: "Winston Churchill" },
-        { id: "Cleopatra" }
+        { id: "Cleopatra" },
+        { id: "Albert Einstein" },
+        { id: "Joan of Arc" },
+        { id: "Mahatma Gandhi" }
       ],
       newMessage: "",
       sessionId: null,
@@ -175,6 +191,9 @@ export default {
         jc: { label: "Julius Caesar", state: false},
         wc: { label: "Winston Churchill", state: false},
         c: { label: "Cleopatra", state: false},
+        ae: { label: "Albert Einstein", state: false },
+        ja: { label: "Joan of Arc", state: false },
+        mg: { label: "Mahatma Gandhi", state: false }
       },
       maxLength: 0,
       rebuttles: 0,
