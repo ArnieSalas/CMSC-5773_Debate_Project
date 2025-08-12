@@ -59,6 +59,18 @@
                     src="@/assets/avatars/don_avatar.png"
                   >
                   <img
+                    v-else-if="msg.sender === 'Julius Caesar'"
+                    src="@/assets/avatars/julius_avatar.png"
+                  >
+                  <img
+                    v-else-if="msg.sender === 'Winston Churchill'"
+                    src="@/assets/avatars/winston_avatar.png"
+                  >
+                  <img
+                    v-else-if="msg.sender === 'Cleopatra'"
+                    src="@/assets/avatars/cleopatradon_avatar.png"
+                  >
+                  <img
                     v-else
                     src="@/assets/avatars/user_avatar.png"
                   >
@@ -148,7 +160,10 @@ export default {
         { id: "Genghis Khan" },
         { id: "Kim Jong Un" }, 
         { id: "George Washington" },
-        { id: "Donald Trump" }
+        { id: "Donald Trump" },
+        { id: "Julius Caesar" },
+        { id: "Winston Churchill" },
+        { id: "Cleopatra" }
       ],
       newMessage: "",
       sessionId: null,
@@ -156,7 +171,10 @@ export default {
         gk: { label: "Genghis Khan", state: false },
         kj: { label: "Kim Jong Un", state: false },
         gw: { label: "George Washington", state: false },
-        dt: { label: "Donald Trump", state: false }
+        dt: { label: "Donald Trump", state: false },
+        jc: { label: "Julius Caesar", state: false},
+        wc: { label: "Winston Churchill", state: false},
+        c: { label: "Cleopatra", state: false},
       },
       maxLength: 0,
       rebuttles: 0,
