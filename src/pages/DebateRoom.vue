@@ -59,6 +59,18 @@
                     src="@/assets/avatars/don_avatar.png"
                   >
                   <img
+                    v-else-if="msg.sender === 'Albert Einstein'"
+                    src="@/assets/avatars/albert_einstein_avatar.png"
+                  >
+                  <img
+                    v-else-if="msg.sender === 'Joan of Arc'"
+                    src="@/assets/avatars/joan_of_arc_avatar.png"
+                  >
+                  <img
+                    v-else-if="msg.sender === 'Mahatma Gandhi'"
+                    src="@/assets/avatars/mahatma_gandhi_avatar.png"
+                  >
+                  <img
                     v-else
                     src="@/assets/avatars/user_avatar.png"
                   >
@@ -148,7 +160,10 @@ export default {
         { id: "Genghis Khan" },
         { id: "Kim Jong Un" }, 
         { id: "George Washington" },
-        { id: "Donald Trump" }
+        { id: "Donald Trump" },
+        { id: "Albert Einstein" },
+        { id: "Joan of Arc" },
+        { id: "Mahatma Gandhi" }
       ],
       newMessage: "",
       sessionId: null,
@@ -156,7 +171,10 @@ export default {
         gk: { label: "Genghis Khan", state: false },
         kj: { label: "Kim Jong Un", state: false },
         gw: { label: "George Washington", state: false },
-        dt: { label: "Donald Trump", state: false }
+        dt: { label: "Donald Trump", state: false },
+        ae: { label: "Albert Einstein", state: false },
+        ja: { label: "Joan of Arc", state: false },
+        mg: { label: "Mahatma Gandhi", state: false }
       },
       maxLength: 0,
       rebuttles: 0,
